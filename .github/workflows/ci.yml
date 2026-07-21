@@ -1,9 +1,3 @@
-- name: Stop and clean up
-      if: always()
-      run: |
-        docker compose down -v
-        docker system prune -f
-
 name: CI
 
 on:
@@ -15,9 +9,6 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-
-    services:
-      # No external services needed as we'll use docker-compose
 
     steps:
     - name: Checkout code
@@ -72,13 +63,10 @@ jobs:
       run: |
         # Test basic API endpoints
         echo "Testing API endpoints..."
-
         # Test health endpoint
         curl -s http://localhost:8000/health | grep -q "healthy" && echo "✓ Health check passed" || echo "✗ Health check failed"
-
         # Test auth endpoints (should return 401 or 400 without auth)
         curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/auth/me | grep -q "401" && echo "✓ Auth protection working" || echo "✗ Auth protection not working"
-
         # Test cars endpoint (should return 401 or 400 without auth)
         curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/cars | grep -q "401" && echo "✓ Cars endpoint protected" || echo "✗ Cars endpoint not properly protected"
 
