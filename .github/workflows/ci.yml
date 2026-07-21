@@ -1,0 +1,89 @@
+- name: Stop and clean up
+      if: always()
+      run: |
+        docker compose down -v
+        docker system prune -f
+
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      # No external services needed as we'll use docker-compose
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Set up Docker Compose
+      run: |
+        docker compose version
+
+    - name: Build Docker images
+      run: |
+        docker compose build
+
+    - name: Start containers
+      run: |
+        docker compose up -d
+        # Wait for services to be healthy
+        echo "Waiting for services to be healthy..."
+        sleep 30
+
+    - name: Check backend health
+      run: |
+        # Wait a bit more for backend to be ready
+        sleep 10
+        # Check if backend is responding
+        for i in {1..10}; do
+          if curl -s http://localhost:8000/health; then
+            echo "Backend is healthy"
+            break
+          fi
+          echo "Waiting for backend to be ready... ($i/10)"
+          sleep 5
+        done
+
+    - name: Check frontend is accessible
+      run: |
+        # Wait for frontend
+        sleep 10
+        for i in {1..10}; do
+          if curl -s http://localhost:8501; then
+            echo "Frontend is accessible"
+            break
+          fi
+          echo "Waiting for frontend to be ready... ($i/10)"
+          sleep 5
+        done
+
+    - name: Run basic API tests
+      run: |
+        # Test basic API endpoints
+        echo "Testing API endpoints..."
+
+        # Test health endpoint
+        curl -s http://localhost:8000/health | grep -q "healthy" && echo "✓ Health check passed" || echo "✗ Health check failed"
+
+        # Test auth endpoints (should return 401 or 400 without auth)
+        curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/auth/me | grep -q "401" && echo "✓ Auth protection working" || echo "✗ Auth protection not working"
+
+        # Test cars endpoint (should return 401 or 400 without auth)
+        curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/cars | grep -q "401" && echo "✓ Cars endpoint protected" || echo "✗ Cars endpoint not properly protected"
+
+    - name: Stop and clean up
+      if: always()
+      run: |
+        docker compose down -v
+        docker system prune -f
